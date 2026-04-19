@@ -16,3 +16,14 @@ class AccountsTests(TestCase):
     def test_signup_page_renders(self):
         response = self.client.get(reverse('accounts:signup'))
         self.assertEqual(response.status_code, 200)
+
+    def test_login_page_accepts_post_placeholder(self):
+        response = self.client.post(reverse('accounts:login'), data={'username': 'tester', 'password': 'x'})
+        self.assertEqual(response.status_code, 200)
+
+    def test_signup_page_accepts_post_placeholder(self):
+        response = self.client.post(
+            reverse('accounts:signup'),
+            data={'username': 'tester', 'email': 'test@example.com', 'password': 'x'},
+        )
+        self.assertEqual(response.status_code, 200)
