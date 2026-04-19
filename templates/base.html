@@ -11,9 +11,20 @@
     <nav>
         <a href="{% url 'dashboard:index' %}">Home</a>
         <a href="{% url 'dashboard:dashboard' %}">Dashboard</a>
-        <a href="{% url 'accounts:login' %}">Login</a>
-        <a href="{% url 'accounts:signup' %}">Signup</a>
+        {% if user.is_authenticated %}
+            <a href="{% url 'accounts:logout' %}">Logout</a>
+        {% else %}
+            <a href="{% url 'accounts:login' %}">Login</a>
+            <a href="{% url 'accounts:signup' %}">Signup</a>
+        {% endif %}
     </nav>
+    {% if messages %}
+        <ul>
+            {% for message in messages %}
+                <li>{{ message }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
     <main>
         {% block content %}{% endblock %}
     </main>

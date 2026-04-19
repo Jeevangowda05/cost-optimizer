@@ -17,3 +17,23 @@ class PredictionModel(models.Model):
 
     def __str__(self):
         return f'Prediction {self.id}'
+
+
+class CloudDataset(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='cloud_datasets',
+    )
+    cpu = models.FloatField()
+    memory = models.FloatField()
+    cost = models.FloatField()
+    tag = models.CharField(max_length=100)
+    cloud = models.CharField(max_length=50)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-uploaded_at']
+
+    def __str__(self):
+        return f'{self.cloud} - {self.tag}'
