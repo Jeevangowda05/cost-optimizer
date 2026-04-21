@@ -7,5 +7,10 @@ def success_response(payload, status=200):
     return JsonResponse(body, status=status)
 
 
-def error_response(message, status=400):
-    return JsonResponse({'success': False, 'error': message}, status=status)
+def error_response(status=400):
+    messages = {
+        400: 'Invalid request.',
+        500: 'Internal server error.',
+        503: 'Service unavailable.',
+    }
+    return JsonResponse({'success': False, 'error': messages.get(status, 'Request failed.')}, status=status)

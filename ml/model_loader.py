@@ -1,13 +1,9 @@
 from functools import lru_cache
 from pathlib import Path
-import pickle
 
 from django.conf import settings
 
-try:
-    import joblib
-except ImportError:  # pragma: no cover - fallback path
-    joblib = None
+import joblib
 
 
 def get_model_path(kind):
@@ -21,11 +17,13 @@ def get_model_path(kind):
 @lru_cache(maxsize=2)
 def load_model(kind):
     model_path = get_model_path(kind)
+    trusted_dir = (Path(settings.BASE_DIR) / 'ml' / 'models').resolve()
+    resolved_path = model_path.resolve()
+    if not resolved_path.is_relative_to(trusted_dir):
+        raise ValueError('Model path must be inside ml/models.')
     if not model_path.exists():
         raise FileNotFoundError(f'Model file not found: {model_path}')
+    if model_path.suffix != '.pkl':
+        raise ValueError('Unsupported model file format. Expected .pkl files.')
 
-    if joblib is not None:
-        return joblib.load(model_path)
-
-    with model_path.open('rb') as model_file:
-        return pickle.load(model_file)
+    return joblib.load(resolved_path)

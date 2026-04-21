@@ -7,6 +7,7 @@ from django.db import transaction
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 
+from cloud_optimizer.request_utils import extract_float, extract_payload
 from cloud_optimizer.response_utils import error_response, success_response
 
 from .model_loader import load_model
@@ -17,17 +18,17 @@ from .models import AnomalyRecord, CloudDataset, PredictionModel
 @require_POST
 def predict_view(request):
     try:
-        payload = _extract_request_payload(request)
+        payload = extract_payload(request)
         cpu, memory = _extract_cpu_memory(payload)
         model = load_model('prediction')
         prediction = model.predict([[cpu, memory]])
         confidence = _extract_confidence(model, [[cpu, memory]])
-    except ValueError as exc:
-        return error_response(str(exc), status=400)
-    except FileNotFoundError as exc:
-        return error_response(str(exc), status=503)
+    except ValueError:
+        return error_response(status=400)
+    except FileNotFoundError:
+        return error_response(status=503)
     except Exception:
-        return error_response('Prediction failed. Please try again later.', status=500)
+        return error_response(status=500)
 
     prediction_value = float(prediction[0])
     PredictionModel.objects.create(
@@ -48,9 +49,9 @@ def predict_view(request):
 @require_POST
 def anomaly_view(request):
     try:
-        payload = _extract_request_payload(request)
+        payload = extract_payload(request)
         cpu, memory = _extract_cpu_memory(payload)
-        cost = _extract_float(payload.get('cost'), field_name='cost', required=False)
+        cost = extract_float(payload.get('cost'), 'cost', required=False)
         model = load_model('anomaly')
         features = [[cpu, memory]] if cost is None else [[cpu, memory, cost]]
         anomaly_value = int(model.predict(features)[0])
@@ -66,12 +67,12 @@ def anomaly_view(request):
             if anomaly_detected
             else 'Current usage appears within expected range.'
         )
-    except ValueError as exc:
-        return error_response(str(exc), status=400)
-    except FileNotFoundError as exc:
-        return error_response(str(exc), status=503)
+    except ValueError:
+        return error_response(status=400)
+    except FileNotFoundError:
+        return error_response(status=503)
     except Exception:
-        return error_response('Anomaly detection failed. Please try again later.', status=500)
+        return error_response(status=500)
 
     AnomalyRecord.objects.create(
         user=request.user,
@@ -168,33 +169,10 @@ def _extract_records(request):
     raise ValueError('Unsupported file format. Use CSV or JSON.')
 
 
-def _extract_request_payload(request):
-    if request.content_type and 'application/json' in request.content_type:
-        try:
-            return json.loads(request.body.decode('utf-8') or '{}')
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise ValueError('Invalid JSON payload.') from exc
-    return request.POST
-
-
 def _extract_cpu_memory(payload):
-    cpu = _extract_float(payload.get('cpu'), field_name='cpu')
-    memory = _extract_float(payload.get('memory'), field_name='memory')
+    cpu = extract_float(payload.get('cpu'), 'cpu')
+    memory = extract_float(payload.get('memory'), 'memory')
     return cpu, memory
-
-
-def _extract_float(value, field_name, required=True):
-    if value in (None, ''):
-        if required:
-            raise ValueError(f'{field_name} is required.')
-        return None
-    try:
-        parsed = float(value)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f'{field_name} must be a number.') from exc
-    if parsed < 0:
-        raise ValueError(f'{field_name} must be non-negative.')
-    return parsed
 
 
 def _extract_confidence(model, features):
