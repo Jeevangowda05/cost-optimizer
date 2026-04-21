@@ -37,3 +37,23 @@ class CloudDataset(models.Model):
 
     def __str__(self):
         return f'{self.cloud} - {self.tag}'
+
+
+class AnomalyRecord(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='anomaly_records',
+    )
+    input_data = models.JSONField(default=dict)
+    anomaly_detected = models.BooleanField(default=False)
+    anomaly_type = models.CharField(max_length=100, blank=True)
+    severity = models.CharField(max_length=20, blank=True)
+    explanation = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'AnomalyRecord {self.id} - {self.anomaly_type or "normal"}'

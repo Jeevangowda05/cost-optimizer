@@ -99,3 +99,6 @@ LOGOUT_REDIRECT_URL = 'accounts:login'
 SESSION_COOKIE_AGE = 3600
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 SESSION_COOKIE_SECURE = False
+
+ML_MODEL_PATH = config('ML_MODEL_PATH', default=str(BASE_DIR / 'ml' / 'models' / 'model.pkl'))
+ANOMALY_MODEL_PATH = config('ANOMALY_MODEL_PATH', default=str(BASE_DIR / 'ml' / 'models' / 'anomaly.pkl'))
