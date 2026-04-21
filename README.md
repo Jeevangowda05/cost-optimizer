@@ -37,7 +37,8 @@ Open: http://127.0.0.1:8000/
 - `/accounts/signup/` - Signup skeleton
 - `/accounts/logout/` - Logout endpoint
 - `/ml/predict/` - ML placeholder endpoint
-- `/optimizer/recommendations/` - Optimizer placeholder endpoint
+- `/ml/anomaly/` - ML anomaly detection endpoint
+- `/optimizer/recommendations/` - Optimizer recommendations endpoint
 - `/admin/` - Django admin
 
 ## Day 1 Deliverables Included
