@@ -102,3 +102,26 @@ SESSION_COOKIE_SECURE = False
 
 ML_MODEL_PATH = config('ML_MODEL_PATH', default=str(BASE_DIR / 'ml' / 'models' / 'model.pkl'))
 ANOMALY_MODEL_PATH = config('ANOMALY_MODEL_PATH', default=str(BASE_DIR / 'ml' / 'models' / 'anomaly.pkl'))
+
+CARBON_GRAMS_PER_CPU_HOUR = config('CARBON_GRAMS_PER_CPU_HOUR', default=55.0, cast=float)
+CARBON_GRAMS_PER_MEMORY_GB_HOUR = config('CARBON_GRAMS_PER_MEMORY_GB_HOUR', default=8.0, cast=float)
+
+REGION_CARBON_FACTORS = {
+    'us-east-1': 1.0,
+    'us-west-2': 0.9,
+    'eu-central-1': 0.75,
+    'ap-south-1': 1.15,
+}
+
+REGION_COST_MAPPING = {
+    'us-east-1': 1.0,
+    'us-west-2': 1.08,
+    'eu-central-1': 1.12,
+    'ap-south-1': 0.95,
+}
+
+CHATBOT_KNOWLEDGE_BASE = {
+    'default': 'Ask about budget alerts, sustainability, region optimization, and recommendations.',
+    'sustainability': 'Use /optimizer/carbon/ to log emissions and /optimizer/sustainability/ for score.',
+    'region': 'Use /optimizer/region-advisor/ to compare costs across regions.',
+}
