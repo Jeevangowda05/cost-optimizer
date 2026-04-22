@@ -2,11 +2,10 @@ from django.http import JsonResponse
 
 
 def success_response(payload=None, status=200, message=None):
-    payload = payload or {}
+    payload = {} if payload is None else payload
     body = {'success': True, 'data': payload}
     if message:
         body['message'] = message
-    body.update(payload)
     return JsonResponse(body, status=status)
 
 
@@ -18,7 +17,20 @@ def error_response(status=400, error=None, code=None):
         500: 'Internal server error.',
         503: 'Service unavailable.',
     }
-    error_message = error or messages.get(status, 'Request failed.')
+    custom_messages = {
+        'budget_not_set': 'Budget threshold not configured.',
+        'invalid_dataset_payload': 'Invalid dataset payload.',
+        'empty_dataset': 'No dataset records provided.',
+        'invalid_dataset_format': 'Invalid dataset format.',
+        'invalid_threshold': 'Threshold must be a non-negative number.',
+        'invalid_current_cost': 'Current cost must be a non-negative number.',
+        'invalid_schedule_name': 'Schedule name is required.',
+        'invalid_scheduled_time': 'Scheduled time must be a valid ISO datetime.',
+        'invalid_boolean': 'Boolean value expected.',
+        'invalid_integer': 'Integer value expected.',
+        'invalid_query': 'Query is required.',
+    }
+    error_message = custom_messages.get(code) or messages.get(status, 'Request failed.')
     error_code = code or {
         400: 'invalid_request',
         404: 'not_found',

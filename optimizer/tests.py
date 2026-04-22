@@ -35,9 +35,9 @@ class OptimizerTests(TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertTrue(payload['success'])
-        self.assertGreaterEqual(len(payload['recommendations']), 1)
-        self.assertIn('type', payload['recommendations'][0])
-        self.assertEqual(Recommendation.objects.count(), len(payload['recommendations']))
+        self.assertGreaterEqual(len(payload['data']['recommendations']), 1)
+        self.assertIn('type', payload['data']['recommendations'][0])
+        self.assertEqual(Recommendation.objects.count(), len(payload['data']['recommendations']))
 
     def test_recommendations_invalid_input(self):
         user = CustomUser.objects.create_user(username='optuser2', password='StrongPass1!')
@@ -61,7 +61,7 @@ class OptimizerTests(TestCase):
 
         status_response = self.client.get(f"{reverse('optimizer:budget_status')}?current_cost=85")
         self.assertEqual(status_response.status_code, 200)
-        self.assertEqual(status_response.json()['budget']['alert_status'], BudgetAlert.ALERT_WARNING)
+        self.assertEqual(status_response.json()['data']['budget']['alert_status'], BudgetAlert.ALERT_WARNING)
 
         check_response = self.client.post(
             reverse('optimizer:budget_alert_check'),
@@ -69,7 +69,7 @@ class OptimizerTests(TestCase):
             content_type='application/json',
         )
         self.assertEqual(check_response.status_code, 200)
-        self.assertEqual(check_response.json()['alert']['status'], BudgetAlert.ALERT_CRITICAL)
+        self.assertEqual(check_response.json()['data']['alert']['status'], BudgetAlert.ALERT_CRITICAL)
 
     def test_scheduler_set_list_and_toggle(self):
         user = CustomUser.objects.create_user(username='scheduleuser', password='StrongPass1!')
@@ -82,17 +82,17 @@ class OptimizerTests(TestCase):
             content_type='application/json',
         )
         self.assertEqual(set_response.status_code, 200)
-        schedule_id = set_response.json()['schedule']['id']
+        schedule_id = set_response.json()['data']['schedule']['id']
         self.assertEqual(ShutdownSchedule.objects.count(), 1)
 
         list_response = self.client.get(reverse('optimizer:scheduler_list'))
         self.assertEqual(list_response.status_code, 200)
-        self.assertEqual(len(list_response.json()['schedules']), 1)
-        self.assertIsNotNone(list_response.json()['next_shutdown_time'])
+        self.assertEqual(len(list_response.json()['data']['schedules']), 1)
+        self.assertIsNotNone(list_response.json()['data']['next_shutdown_time'])
 
         toggle_response = self.client.put(reverse('optimizer:scheduler_toggle', args=[schedule_id]))
         self.assertEqual(toggle_response.status_code, 200)
-        self.assertFalse(toggle_response.json()['schedule']['is_active'])
+        self.assertFalse(toggle_response.json()['data']['schedule']['is_active'])
 
     def test_simulator_endpoint(self):
         user = CustomUser.objects.create_user(username='simuser', password='StrongPass1!')
@@ -105,7 +105,7 @@ class OptimizerTests(TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertTrue(payload['success'])
-        self.assertGreaterEqual(payload['simulation']['savings'], 0)
+        self.assertGreaterEqual(payload['data']['simulation']['savings'], 0)
         self.assertEqual(Simulation.objects.count(), 1)
 
     def test_carbon_and_sustainability_endpoints(self):
@@ -121,7 +121,7 @@ class OptimizerTests(TestCase):
 
         sustainability_response = self.client.get(reverse('optimizer:sustainability'))
         self.assertEqual(sustainability_response.status_code, 200)
-        self.assertIn('score', sustainability_response.json()['sustainability'])
+        self.assertIn('score', sustainability_response.json()['data']['sustainability'])
         self.assertEqual(SustainabilityScore.objects.count(), 1)
 
     def test_region_kubernetes_and_chatbot_endpoints(self):
@@ -133,7 +133,7 @@ class OptimizerTests(TestCase):
             content_type='application/json',
         )
         self.assertEqual(region_response.status_code, 200)
-        self.assertIn('recommended_region', region_response.json()['region_advice'])
+        self.assertIn('recommended_region', region_response.json()['data']['region_advice'])
         self.assertEqual(RegionRecommendation.objects.count(), 1)
 
         k8s_response = self.client.post(
@@ -150,5 +150,5 @@ class OptimizerTests(TestCase):
             content_type='application/json',
         )
         self.assertEqual(chatbot_response.status_code, 200)
-        self.assertIn('response', chatbot_response.json()['chatbot'])
+        self.assertIn('response', chatbot_response.json()['data']['chatbot'])
         self.assertEqual(ChatbotInteraction.objects.count(), 1)

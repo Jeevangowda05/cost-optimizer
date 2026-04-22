@@ -97,11 +97,11 @@ def anomaly_view(request):
 def upload_dataset_view(request):
     try:
         records = _extract_records(request)
-    except ValueError as exc:
-        return error_response(status=400, error=str(exc), code='invalid_dataset_payload')
+    except ValueError:
+        return error_response(status=400, code='invalid_dataset_payload')
 
     if not records:
-        return error_response(status=400, error='No dataset records provided.', code='empty_dataset')
+        return error_response(status=400, code='empty_dataset')
 
     dataset_rows = []
     for record in records:
@@ -119,7 +119,6 @@ def upload_dataset_view(request):
         except (KeyError, TypeError, ValueError):
             return error_response(
                 status=400,
-                error='Invalid dataset format. Required fields: cpu, memory, cost, tag, cloud.',
                 code='invalid_dataset_format',
             )
 

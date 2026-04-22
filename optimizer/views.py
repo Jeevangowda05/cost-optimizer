@@ -34,6 +34,26 @@ from .simulator import simulate_cost
 from .sustainability import calculate_sustainability_score
 
 
+def _extract_bool(value, name):
+    if isinstance(value, bool):
+        return value
+    normalized = str(value).strip().lower()
+    if normalized in {'true', '1', 'yes'}:
+        return True
+    if normalized in {'false', '0', 'no'}:
+        return False
+    raise ValueError(f'{name} must be a boolean.')
+
+
+def _extract_int(value, name):
+    if value in (None, ''):
+        raise ValueError(f'{name} must be an integer.')
+    parsed = extract_float(value, name)
+    if not parsed.is_integer():
+        raise ValueError(f'{name} must be an integer.')
+    return int(parsed)
+
+
 @login_required
 @require_POST
 def recommendations_view(request):
@@ -67,8 +87,8 @@ def set_budget_view(request):
     try:
         payload = extract_payload(request)
         threshold = normalize_currency(extract_float(payload.get('threshold'), 'threshold'))
-    except ValueError as exc:
-        return error_response(status=400, error=str(exc))
+    except ValueError:
+        return error_response(status=400, code='invalid_threshold')
 
     budget = BudgetAlert.objects.filter(user=request.user).order_by('-updated_at').first()
     if budget:
@@ -101,7 +121,9 @@ def _resolve_current_cost(request, payload):
     raw_cost = query_cost if query_cost not in (None, '') else value
     if raw_cost in (None, ''):
         latest = Simulation.objects.filter(user=request.user).order_by('-created_at').first()
-        return float(latest.current_cost) if latest else 0.0
+        if latest:
+            return float(latest.current_cost)
+        raise ValueError('current_cost is required when no simulation history exists.')
     return extract_float(raw_cost, 'current_cost')
 
 
@@ -110,12 +132,12 @@ def _resolve_current_cost(request, payload):
 def budget_status_view(request):
     budget = BudgetAlert.objects.filter(user=request.user).first()
     if not budget:
-        return error_response(status=404, error='Budget threshold not configured.', code='budget_not_set')
+        return error_response(status=404, code='budget_not_set')
 
     try:
         current_cost = normalize_currency(_resolve_current_cost(request, {}))
-    except ValueError as exc:
-        return error_response(status=400, error=str(exc))
+    except ValueError:
+        return error_response(status=400, code='invalid_current_cost')
     status_value = evaluate_alert_status(budget.threshold, current_cost)
     budget.current_cost = current_cost
     budget.alert_status = status_value
@@ -136,13 +158,13 @@ def budget_status_view(request):
 def budget_alert_check_view(request):
     budget = BudgetAlert.objects.filter(user=request.user).first()
     if not budget:
-        return error_response(status=404, error='Budget threshold not configured.', code='budget_not_set')
+        return error_response(status=404, code='budget_not_set')
 
     try:
         payload = extract_payload(request)
         current_cost = normalize_currency(_resolve_current_cost(request, payload))
-    except ValueError as exc:
-        return error_response(status=400, error=str(exc))
+    except ValueError:
+        return error_response(status=400, code='invalid_current_cost')
 
     status_value = evaluate_alert_status(budget.threshold, current_cost)
     budget.current_cost = current_cost
@@ -168,16 +190,20 @@ def scheduler_set_view(request):
         payload = extract_payload(request)
         schedule_name = str(payload.get('schedule_name', '')).strip()
         if not schedule_name:
-            raise ValueError('schedule_name is required.')
+            return error_response(status=400, code='invalid_schedule_name')
         schedule_dt = parse_datetime(str(payload.get('scheduled_time', '')).strip())
         if not schedule_dt:
-            raise ValueError('scheduled_time must be an ISO datetime.')
+            return error_response(status=400, code='invalid_scheduled_time')
         if timezone.is_naive(schedule_dt):
             schedule_dt = timezone.make_aware(schedule_dt, timezone.get_current_timezone())
-        is_active = _extract_bool(payload.get('is_active', True), 'is_active')
         schedule_id = payload.get('id')
-    except ValueError as exc:
-        return error_response(status=400, error=str(exc))
+    except ValueError:
+        return error_response(status=400, code='invalid_scheduled_time')
+
+    try:
+        is_active = _extract_bool(payload.get('is_active', True), 'is_active')
+    except ValueError:
+        return error_response(status=400, code='invalid_boolean')
 
     if schedule_id:
         schedule = get_object_or_404(ShutdownSchedule, id=schedule_id, user=request.user)
@@ -246,13 +272,23 @@ def scheduler_toggle_view(request, schedule_id):
 def simulator_view(request):
     try:
         payload = extract_payload(request)
-        current_cpu = extract_float(payload.get('current_cpu', payload.get('cpu')), 'current_cpu')
-        current_memory = extract_float(payload.get('current_memory', payload.get('memory')), 'current_memory')
         cpu = extract_float(payload.get('cpu'), 'cpu')
         memory = extract_float(payload.get('memory'), 'memory')
+        current_cpu_value = payload.get('current_cpu')
+        current_memory_value = payload.get('current_memory')
+        has_current_cpu = current_cpu_value not in (None, '')
+        has_current_memory = current_memory_value not in (None, '')
+        if has_current_cpu != has_current_memory:
+            raise ValueError('current_cpu and current_memory must be provided together.')
+        if not has_current_cpu and not has_current_memory:
+            current_cpu = cpu
+            current_memory = memory
+        else:
+            current_cpu = extract_float(current_cpu_value, 'current_cpu')
+            current_memory = extract_float(current_memory_value, 'current_memory')
         current_cost = extract_float(payload.get('current_cost', 0), 'current_cost')
-    except ValueError as exc:
-        return error_response(status=400, error=str(exc))
+    except ValueError:
+        return error_response(status=400, code='invalid_request')
 
     simulated_cost = simulate_cost(current_cost, current_cpu, current_memory, cpu, memory)
     savings = round(current_cost - simulated_cost, 2)
@@ -275,7 +311,7 @@ def simulator_view(request):
                 'current_cost': float(simulation.current_cost),
                 'simulated_cost': float(simulation.simulated_cost),
                 'savings': float(simulation.savings),
-                'is_improvement': simulation.savings >= 0,
+                'has_savings': simulation.savings > 0,
             }
         }
     )
@@ -291,8 +327,8 @@ def carbon_view(request):
         hours = extract_float(payload.get('hours', 1), 'hours')
         region = str(payload.get('region', 'us-east-1')).strip().lower()
         region_factor = settings.REGION_CARBON_FACTORS.get(region, 1.0)
-    except ValueError as exc:
-        return error_response(status=400, error=str(exc))
+    except ValueError:
+        return error_response(status=400, code='invalid_request')
 
     carbon_grams = calculate_carbon_emission(
         cpu=cpu,
@@ -332,9 +368,10 @@ def sustainability_view(request):
     if cached is not None:
         return success_response({'sustainability': cached})
 
-    footprints = CarbonFootprint.objects.filter(user=request.user)
+    footprints = CarbonFootprint.objects.filter(user=request.user).order_by('-created_at')
     avg_carbon = footprints.aggregate(avg=Avg('carbon_grams')).get('avg') or 0.0
-    latest_region = footprints.first().region if footprints.exists() else 'n/a'
+    latest_footprint = footprints.first()
+    latest_region = latest_footprint.region if latest_footprint else 'n/a'
     score = calculate_sustainability_score(avg_carbon_grams=float(avg_carbon))
     breakdown = {
         'average_carbon_grams': round(float(avg_carbon), 4),
@@ -356,8 +393,8 @@ def region_advisor_view(request):
         cpu = extract_float(payload.get('cpu'), 'cpu')
         memory = extract_float(payload.get('memory'), 'memory')
         hours = extract_float(payload.get('hours', 1), 'hours')
-    except ValueError as exc:
-        return error_response(status=400, error=str(exc))
+    except ValueError:
+        return error_response(status=400, code='invalid_request')
 
     costs = {
         region: estimate_region_cost(cpu, memory, hours, multiplier)
@@ -395,8 +432,8 @@ def kubernetes_simulation_view(request):
         hours = extract_float(payload.get('hours', 1), 'hours')
         region = str(payload.get('region', 'us-east-1')).strip().lower()
         region_multiplier = settings.REGION_COST_MAPPING.get(region, 1.0)
-    except ValueError as exc:
-        return error_response(status=400, error=str(exc))
+    except ValueError:
+        return error_response(status=400, code='invalid_request')
 
     predicted_cost, total_cpu, total_memory = simulate_kubernetes_cost(
         cpu=cpu,
@@ -431,9 +468,9 @@ def chatbot_view(request):
         payload = extract_payload(request)
         query = str(payload.get('query', '')).strip()
         if not query:
-            raise ValueError('query is required.')
-    except ValueError as exc:
-        return error_response(status=400, error=str(exc))
+            return error_response(status=400, code='invalid_query')
+    except ValueError:
+        return error_response(status=400, code='invalid_request')
 
     latest_budget = BudgetAlert.objects.filter(user=request.user).first()
     latest_sustainability = SustainabilityScore.objects.filter(user=request.user).first()
@@ -447,21 +484,3 @@ def chatbot_view(request):
     reply = generate_chatbot_response(query, settings.CHATBOT_KNOWLEDGE_BASE, context)
     interaction = ChatbotInteraction.objects.create(user=request.user, query=query, response=reply)
     return success_response({'chatbot': {'id': interaction.id, 'query': query, 'response': reply}})
-
-
-def _extract_bool(value, name):
-    if isinstance(value, bool):
-        return value
-    normalized = str(value).strip().lower()
-    if normalized in {'true', '1', 'yes'}:
-        return True
-    if normalized in {'false', '0', 'no'}:
-        return False
-    raise ValueError(f'{name} must be a boolean.')
-
-
-def _extract_int(value, name):
-    parsed = extract_float(value, name)
-    if not float(parsed).is_integer():
-        raise ValueError(f'{name} must be an integer.')
-    return int(parsed)

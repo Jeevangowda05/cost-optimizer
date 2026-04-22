@@ -34,8 +34,8 @@ class MLTests(TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertTrue(payload['success'])
-        self.assertEqual(payload['prediction']['predicted_cost'], 23.5)
-        self.assertEqual(payload['confidence_score'], 0.8)
+        self.assertEqual(payload['data']['prediction']['predicted_cost'], 23.5)
+        self.assertEqual(payload['data']['confidence_score'], 0.8)
         self.assertEqual(PredictionModel.objects.count(), 1)
 
     @patch('ml.views.load_model', side_effect=FileNotFoundError('Model file not found: /tmp/model.pkl'))
@@ -68,8 +68,8 @@ class MLTests(TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertTrue(payload['success'])
-        self.assertTrue(payload['anomaly_detected'])
-        self.assertEqual(payload['severity'], 'high')
+        self.assertTrue(payload['data']['anomaly_detected'])
+        self.assertEqual(payload['data']['severity'], 'high')
         self.assertEqual(AnomalyRecord.objects.count(), 1)
 
     def test_anomaly_requires_authentication(self):
@@ -91,7 +91,7 @@ class MLTests(TestCase):
             content_type='application/json',
         )
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.json()['count'], 2)
+        self.assertEqual(response.json()['data']['count'], 2)
         self.assertEqual(CloudDataset.objects.count(), 2)
 
     def test_upload_dataset_requires_authentication(self):
