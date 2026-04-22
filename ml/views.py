@@ -4,7 +4,6 @@ from io import StringIO
 
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
-from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 
 from cloud_optimizer.request_utils import extract_float, extract_payload
@@ -98,11 +97,11 @@ def anomaly_view(request):
 def upload_dataset_view(request):
     try:
         records = _extract_records(request)
-    except ValueError as exc:
-        return JsonResponse({'error': str(exc)}, status=400)
+    except ValueError:
+        return error_response(status=400, code='invalid_dataset_payload')
 
     if not records:
-        return JsonResponse({'error': 'No dataset records provided.'}, status=400)
+        return error_response(status=400, code='empty_dataset')
 
     dataset_rows = []
     for record in records:
@@ -118,15 +117,15 @@ def upload_dataset_view(request):
                 )
             )
         except (KeyError, TypeError, ValueError):
-            return JsonResponse(
-                {'error': 'Invalid dataset format. Required fields: cpu, memory, cost, tag, cloud.'},
+            return error_response(
                 status=400,
+                code='invalid_dataset_format',
             )
 
     with transaction.atomic():
         CloudDataset.objects.bulk_create(dataset_rows)
 
-    return JsonResponse({'message': 'Dataset uploaded successfully.', 'count': len(dataset_rows)}, status=201)
+    return success_response({'count': len(dataset_rows)}, status=201, message='Dataset uploaded successfully.')
 
 
 def _extract_records(request):

@@ -39,6 +39,18 @@ Open: http://127.0.0.1:8000/
 - `/ml/predict/` - ML placeholder endpoint
 - `/ml/anomaly/` - ML anomaly detection endpoint
 - `/optimizer/recommendations/` - Optimizer recommendations endpoint
+- `/optimizer/budget/set/` - Set budget threshold
+- `/optimizer/budget/status/` - Get budget status
+- `/optimizer/budget/alerts/check/` - Check budget alerts
+- `/optimizer/scheduler/set/` - Create/update shutdown schedule
+- `/optimizer/scheduler/list/` - List active shutdown schedules
+- `/optimizer/scheduler/{id}/toggle/` - Enable/disable schedule
+- `/optimizer/simulator/` - Run what-if simulation
+- `/optimizer/carbon/` - Calculate carbon footprint
+- `/optimizer/sustainability/` - Get sustainability score
+- `/optimizer/region-advisor/` - Region recommendation
+- `/optimizer/kubernetes/simulate/` - Kubernetes simulation
+- `/optimizer/chatbot/` - Chatbot query endpoint
 - `/admin/` - Django admin
 
 ## Day 1 Deliverables Included
